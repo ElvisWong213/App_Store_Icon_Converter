@@ -12,6 +12,6 @@ fn main() {
     println!("Output path");
     stdin().read_line(&mut output_path).unwrap();
     let mut img_p = ImageProcess::new(input_path, output_path);
-    img_p.start();
+    img_p.run();
 }
 
