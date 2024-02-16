@@ -1,4 +1,5 @@
 mod image_process;
+mod output_format;
 mod args;
 
 use image_process::ImageProcess;

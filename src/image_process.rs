@@ -1,14 +1,13 @@
 use core::panic;
 use std::{fs::create_dir_all, path::Path, process::exit};
-
 use image::{imageops, open, GenericImage, ImageBuffer, Rgba};
+
+use crate::output_format::OutputFormat;
 
 #[derive(Debug)]
 pub struct ImageProcess {
     input_path: String,
     output_path: String,
-    width: u32,
-    height: u32,
 }
 
 impl ImageProcess {
@@ -22,8 +21,6 @@ impl ImageProcess {
         Self { 
             input_path: input,
             output_path: output,
-            width: 0,
-            height: 0
         }
     } 
 
@@ -44,9 +41,12 @@ impl ImageProcess {
         });
 
         // Export images
+        let mut buffer: ImageBuffer<Rgba<u16>, Vec<u16>> = ImageBuffer::new(0, 0);
         for output_file in app_store_outputs { 
-            let output = imageops::resize(&app_store_image, output_file.size, output_file.size, imageops::FilterType::CatmullRom); 
-            self.save(&output, &output_file.name, &output_file.format);
+            if buffer.height() != output_file.size {
+                buffer = imageops::resize(&app_store_image, output_file.size, output_file.size, imageops::FilterType::CatmullRom); 
+            }
+            self.save(&buffer, &output_file.name, &output_file.format);
         }
         println!("Finish");
     }
@@ -72,14 +72,16 @@ impl ImageProcess {
             exit(0);
         }).into_rgba16();
         let (x, y) = img.dimensions();
-        if x < 1024 || y < 1024 {
-            return Err("Image resolution must be grater or equal to 1024 x 1024");
-        }
         if x != y {
             return Err("image is not square");
         }
-        self.width = x;
-        self.height = y;
+        if x < 1024 || y < 1024 {
+            return Err("Image resolution must be grater or equal to 1024 x 1024");
+        } 
+        if x > 1024 || y > 1024 {
+            let resize_image = imageops::resize(&img, 1024, 1024, imageops::FilterType::CatmullRom);
+            return Ok(resize_image)
+        }
         Ok(img)
     }
 
@@ -89,11 +91,11 @@ impl ImageProcess {
             let _ = output.copy_from(img, 0, 0);
             return output
         }
-        let center = (self.width / 2, self.width / 2); 
+        let center = (1024 / 2, 1024 / 2); 
         let top_left_center = (radius, radius);
-        let top_right_center = (self.width - radius, radius);
-        let bottom_left_center = (radius, self.width - radius);
-        let bottom_right_center = (self.width - radius, self.width - radius);
+        let top_right_center = (1024 - radius, radius);
+        let bottom_left_center = (radius, 1024 - radius);
+        let bottom_right_center = (1024 - radius, 1024 - radius);
 
         for (x, y, pixel) in img.enumerate_pixels() {
             let point = (x, y);
@@ -109,7 +111,7 @@ impl ImageProcess {
             output.put_pixel(x, y, *pixel);
         }
 
-        return output
+        output
     }
 
     fn insert_transparent_border(&self, img: &ImageBuffer<Rgba<u16>, Vec<u16>>) -> ImageBuffer<Rgba<u16>, Vec<u16>> {
@@ -121,7 +123,7 @@ impl ImageProcess {
             output.put_pixel(start_index + x, start_index + y, *pixel);
         }
 
-        return output
+        output
     }
 
     fn find_distance(&self, point_a: (u32, u32), point_b: (u32, u32)) -> u32 {
@@ -134,31 +136,3 @@ impl ImageProcess {
 
 }
 
-struct OutputFormat {
-    name: String,
-    size: u32,
-    format: String,
-}
-
-impl OutputFormat {
-    fn new(name: String, size: u32, format: String) -> Self {
-        Self { name, size, format }
-    }
-
-    fn app_store_outputs() -> Vec<OutputFormat> {
-        let format: String = "png".to_string();
-        vec![
-            Self::new("1024".to_string(), 1024, format.clone()),
-            Self::new("512@2x".to_string(), 1024, format.clone()),
-            Self::new("512".to_string(), 512, format.clone()),
-            Self::new("256@2x".to_string(), 256, format.clone()),
-            Self::new("256".to_string(), 256, format.clone()),
-            Self::new("128@2x".to_string(), 256, format.clone()),
-            Self::new("128".to_string(), 128, format.clone()),
-            Self::new("32@2x".to_string(), 64, format.clone()),
-            Self::new("32".to_string(), 32, format.clone()),
-            Self::new("16@2x".to_string(), 32, format.clone()),
-            Self::new("16".to_string(), 16, format.clone()),
-        ]
-    }
-}
