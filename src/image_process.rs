@@ -1,7 +1,7 @@
 use core::panic;
 use std::{fs::create_dir_all, path::Path, process::exit};
 
-use image::{open, DynamicImage, GenericImage, ImageBuffer, Rgba};
+use image::{imageops, open, GenericImage, ImageBuffer, Rgba};
 
 #[derive(Debug)]
 pub struct ImageProcess {
@@ -32,9 +32,9 @@ impl ImageProcess {
             eprintln!("{}", error);
             exit(0);
         });
-        let mut rounded_corners_image = ImageBuffer::new(self.width, self.height);
-        self.rounded_corners(&image, 186, &mut rounded_corners_image);
-        let dynamic = DynamicImage::ImageRgba16(rounded_corners_image);
+
+        let rounded_corners_image = self.rounded_corners(&image, 234);
+        let app_store_image = self.insert_transparent_border(&rounded_corners_image);
         let app_store_outputs = OutputFormat::app_store_outputs();
 
         // Create folder
@@ -44,14 +44,14 @@ impl ImageProcess {
         });
 
         // Export images
-        for output_file in app_store_outputs {
-           let output = dynamic.resize(output_file.size, output_file.size, image::imageops::FilterType::CatmullRom); 
-           self.save(&output, &output_file.name, &output_file.format);
+        for output_file in app_store_outputs { 
+            let output = imageops::resize(&app_store_image, output_file.size, output_file.size, imageops::FilterType::CatmullRom); 
+            self.save(&output, &output_file.name, &output_file.format);
         }
         println!("Finish");
     }
     
-    fn save(&self, output: &DynamicImage, file_name: &str, format: &str) { 
+    fn save(&self, output: &ImageBuffer<Rgba<u16>, Vec<u16>>, file_name: &str, format: &str) { 
         let output_file_path = self.output_path.to_string() + "/" + file_name + "." + format;
         output.save(&output_file_path).unwrap_or_else(|error| {
             eprintln!("Fail to save the file!: {error}");
@@ -83,10 +83,11 @@ impl ImageProcess {
         Ok(img)
     }
 
-    fn rounded_corners(&self, img: &ImageBuffer<Rgba<u16>, Vec<u16>>, radius: u32, output: &mut ImageBuffer<Rgba<u16>, Vec<u16>>) {
+    fn rounded_corners(&self, img: &ImageBuffer<Rgba<u16>, Vec<u16>>, radius: u32) -> ImageBuffer<Rgba<u16>, Vec<u16>> {
+        let mut output: ImageBuffer<Rgba<u16>, Vec<u16>> = ImageBuffer::new(1024, 1024);
         if radius == 0 {
             let _ = output.copy_from(img, 0, 0);
-            return;
+            return output
         }
         let center = (self.width / 2, self.width / 2); 
         let top_left_center = (radius, radius);
@@ -107,6 +108,20 @@ impl ImageProcess {
             }
             output.put_pixel(x, y, *pixel);
         }
+
+        return output
+    }
+
+    fn insert_transparent_border(&self, img: &ImageBuffer<Rgba<u16>, Vec<u16>>) -> ImageBuffer<Rgba<u16>, Vec<u16>> {
+        let target_size = 824;
+        let resized_image = imageops::resize(img, target_size, target_size, imageops::FilterType::CatmullRom);
+        let mut output: ImageBuffer<Rgba<u16>, Vec<u16>> = ImageBuffer::new(1024, 1024);
+        let start_index = 100;
+        for (x, y, pixel) in resized_image.enumerate_pixels() {
+            output.put_pixel(start_index + x, start_index + y, *pixel);
+        }
+
+        return output
     }
 
     fn find_distance(&self, point_a: (u32, u32), point_b: (u32, u32)) -> u32 {
