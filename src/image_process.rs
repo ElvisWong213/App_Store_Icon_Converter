@@ -67,7 +67,10 @@ impl ImageProcess {
     }
     
     fn check_input_image(&mut self) -> Result<ImageBuffer<Rgba<u16>, Vec<u16>>, &str> {
-        let img = open(&self.input_path).expect("File not found").into_rgba16();
+        let img = open(&self.input_path).unwrap_or_else(|error| {
+            eprintln!("File not found: {error}");
+            exit(0);
+        }).into_rgba16();
         let (x, y) = img.dimensions();
         if x < 1024 || y < 1024 {
             return Err("Image resolution must be grater or equal to 1024 x 1024");
