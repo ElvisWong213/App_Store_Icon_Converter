@@ -67,10 +67,7 @@ impl ImageProcess {
     }
     
     fn check_input_image(&mut self) -> Result<ImageBuffer<Rgba<u16>, Vec<u16>>, &str> {
-        let img = open(&self.input_path).unwrap_or_else(|error| {
-            eprintln!("File not found: {error}");
-            exit(0);
-        }).into_rgba16();
+        let img = open(&self.input_path).unwrap().into_rgba16();
         let (x, y) = img.dimensions();
         if x != y {
             return Err("image is not square");
@@ -92,18 +89,18 @@ impl ImageProcess {
             return output
         }
         let center = (1024 / 2, 1024 / 2); 
-        let top_left_center = (radius, radius);
-        let top_right_center = (1024 - radius, radius);
-        let bottom_left_center = (radius, 1024 - radius);
-        let bottom_right_center = (1024 - radius, 1024 - radius);
+        let top_left = (radius, radius);
+        let top_right = (1024 - radius, radius);
+        let bottom_left = (radius, 1024 - radius);
+        let bottom_right = (1024 - radius, 1024 - radius);
 
         for (x, y, pixel) in img.enumerate_pixels() {
             let point = (x, y);
             let distance_center = self.find_distance(point, center);
-            let distance_top_left = self.find_distance(point, top_left_center);
-            let distance_top_right = self.find_distance(point, top_right_center);
-            let distance_bottom_left = self.find_distance(point, bottom_left_center);
-            let distance_bottom_right = self.find_distance(point, bottom_right_center);
+            let distance_top_left = self.find_distance(point, top_left);
+            let distance_top_right = self.find_distance(point, top_right);
+            let distance_bottom_left = self.find_distance(point, bottom_left);
+            let distance_bottom_right = self.find_distance(point, bottom_right);
 
             if distance_center > self.find_distance((0, radius), center) && distance_top_left > radius && distance_top_right > radius && distance_bottom_left > radius && distance_bottom_right > radius {
                 continue;
