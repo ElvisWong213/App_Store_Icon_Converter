@@ -1,5 +1,5 @@
 [package]
-name = "icon-image"
+name = "icon_image"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,3 +8,7 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.1", features = ["derive"] }
 image = "0.24.8"
+
+[lib]
+name = "icon_image"
+path = "src/lib.rs"
