@@ -1,6 +1,7 @@
 use core::panic;
-use std::{fs::create_dir_all, path::Path, process::exit};
+use std::{error::Error, fs::{create_dir_all, remove_dir_all, File}, io::{self, Read, Write}, path::{Path, PathBuf}, process::exit};
 use image::{imageops, open, GenericImage, ImageBuffer, Rgba};
+use zip::{write::FileOptions, ZipWriter};
 
 use crate::output_format::OutputFormat;
 
@@ -24,7 +25,7 @@ impl ImageProcess {
         }
     } 
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> String {
         let image = self.check_input_image().unwrap_or_else(|error| {
             eprintln!("{}", error);
             exit(0);
@@ -32,7 +33,7 @@ impl ImageProcess {
 
         let rounded_corners_image = self.rounded_corners(&image, 234);
         let app_store_image = self.insert_transparent_border(&rounded_corners_image);
-        let app_store_outputs = OutputFormat::app_store_outputs();
+        let app_store_outputs_format = OutputFormat::app_store_outputs();
 
         // Create folder
         self.create_folder().unwrap_or_else(|error| {
@@ -41,21 +42,61 @@ impl ImageProcess {
         });
 
         // Export images
-        let mut buffer: ImageBuffer<Rgba<u16>, Vec<u16>> = ImageBuffer::new(0, 0);
-        for output_file in app_store_outputs { 
-            if buffer.height() != output_file.size {
-                buffer = imageops::resize(&app_store_image, output_file.size, output_file.size, imageops::FilterType::CatmullRom); 
-            }
-            self.save(&buffer, &output_file.name, &output_file.format);
-        }
+        let files_path = self.export_images(&app_store_image, &app_store_outputs_format);
+        // Zip images
+        let output_path = self.zip_images(&files_path).unwrap_or_else(|error| {
+            eprint!("{error}");
+            exit(0);
+        });
         println!("Finish");
+        output_path
+    }
+
+    fn zip_images(& self, files_path: &Vec<PathBuf>) -> Result<String, Box<dyn Error>> {
+        let path: String = self.output_path.to_string() + ".zip";
+        let zip_file_path = Path::new(&path);
+        let zip_file = File::create(&zip_file_path)?;
+
+        let mut zip = ZipWriter::new(zip_file);
+        let options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        for file_path in files_path {
+            let file = File::open(file_path)?;
+            let file_name = file_path.file_name().unwrap().to_str().unwrap();
+
+            zip.start_file(file_name, options)?;
+            let mut buffer = Vec::new();
+            io::copy(&mut file.take(u64::MAX), &mut buffer)?;
+
+            zip.write_all(&buffer)?;
+        }
+
+        zip.finish()?;
+        let output_path: String = zip_file_path.to_str().unwrap().to_string();
+        remove_dir_all(&self.output_path).unwrap_or_else(|error| {
+            eprint!("{error}");
+        });
+        Ok(output_path)
+    }
+
+    fn export_images(&mut self, images: &ImageBuffer<Rgba<u16>, Vec<u16>>, format: &Vec<OutputFormat>) -> Vec<PathBuf> {
+        let mut buffer: ImageBuffer<Rgba<u16>, Vec<u16>> = ImageBuffer::new(0, 0);
+        let mut files_path_array: Vec<PathBuf> = Vec::new();
+        for output_file in format { 
+            if buffer.height() != output_file.size {
+                buffer = imageops::resize(images, output_file.size, output_file.size, imageops::FilterType::CatmullRom); 
+            }
+            let path = self.save(&buffer, &output_file.name, &output_file.format);
+            files_path_array.push(path);
+        }
+        files_path_array
     }
     
-    fn save(&self, output: &ImageBuffer<Rgba<u16>, Vec<u16>>, file_name: &str, format: &str) { 
+    fn save(&self, output: &ImageBuffer<Rgba<u16>, Vec<u16>>, file_name: &str, format: &str) -> PathBuf { 
         let output_file_path = self.output_path.to_string() + "/" + file_name + "." + format;
         output.save(&output_file_path).unwrap_or_else(|error| {
             eprintln!("Fail to save the file!: {error}");
         });
+        PathBuf::from(output_file_path)
     }
 
     fn create_folder(&self) -> std::io::Result<()> {
