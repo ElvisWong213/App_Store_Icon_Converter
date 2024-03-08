@@ -10,6 +10,6 @@ fn main() {
     let args: IconImageArgs = IconImageArgs::parse();
 
     let mut img_p = ImageProcess::new(args.input_path, args.output_path);
-    img_p.run();
+    img_p.run().unwrap();
 }
 

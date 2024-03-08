@@ -1,5 +1,5 @@
 use core::panic;
-use std::{error::Error, fs::{create_dir_all, remove_dir_all, File}, io::{self, Read, Write}, path::{Path, PathBuf}, process::exit};
+use std::{error::Error, fs::{create_dir_all, remove_dir_all, File}, io::{self, Read, Write}, path::{Path, PathBuf}};
 use image::{imageops, open, GenericImage, ImageBuffer, Rgba};
 use zip::{write::FileOptions, ZipWriter};
 
@@ -25,31 +25,20 @@ impl ImageProcess {
         }
     } 
 
-    pub fn run(&mut self) -> String {
-        let image = self.check_input_image().unwrap_or_else(|error| {
-            eprintln!("{}", error);
-            exit(0);
-        });
-
+    pub fn run(&mut self) -> Result<String, &str> {
+        let image = self.check_input_image().unwrap();
         let rounded_corners_image = self.rounded_corners(&image, 234);
         let app_store_image = self.insert_transparent_border(&rounded_corners_image);
         let app_store_outputs_format = OutputFormat::app_store_outputs();
 
         // Create folder
-        self.create_folder().unwrap_or_else(|error| {
-            eprint!("{error}");
-            exit(0);
-        });
-
+        self.create_folder().unwrap();
         // Export images
         let files_path = self.export_images(&app_store_image, &app_store_outputs_format);
         // Zip images
-        let output_path = self.zip_images(&files_path).unwrap_or_else(|error| {
-            eprint!("{error}");
-            exit(0);
-        });
+        let output_path = self.zip_images(&files_path).unwrap();
         println!("Finish");
-        output_path
+        Ok(output_path)
     }
 
     fn zip_images(& self, files_path: &Vec<PathBuf>) -> Result<String, Box<dyn Error>> {
