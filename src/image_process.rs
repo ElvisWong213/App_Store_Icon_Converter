@@ -25,18 +25,27 @@ impl ImageProcess {
         }
     } 
 
-    pub fn run(&mut self) -> Result<String, &str> {
-        let image = self.check_input_image().unwrap();
+    pub fn run(&mut self) -> Result<String, String> {
+        let image = match self.check_input_image() {
+            Ok(res) => res,
+            Err(err) => return Err(err)
+        };
         let rounded_corners_image = self.rounded_corners(&image, 234);
         let app_store_image = self.insert_transparent_border(&rounded_corners_image);
         let app_store_outputs_format = OutputFormat::app_store_outputs();
 
         // Create folder
-        self.create_folder().unwrap();
+        match self.create_folder() {
+            Ok(_) => {},
+            Err(err) => return Err(err.to_string())
+        };
         // Export images
         let files_path = self.export_images(&app_store_image, &app_store_outputs_format);
         // Zip images
-        let output_path = self.zip_images(&files_path).unwrap();
+        let output_path = match self.zip_images(&files_path) {
+            Ok(path) => path,
+            Err(err) => return Err(err.to_string())
+        };
         println!("Finish");
         Ok(output_path)
     }
@@ -96,14 +105,14 @@ impl ImageProcess {
         Ok(())
     }
     
-    fn check_input_image(&mut self) -> Result<ImageBuffer<Rgba<u16>, Vec<u16>>, &str> {
+    fn check_input_image(&mut self) -> Result<ImageBuffer<Rgba<u16>, Vec<u16>>, String> {
         let img = open(&self.input_path).unwrap().into_rgba16();
         let (x, y) = img.dimensions();
         if x != y {
-            return Err("image is not square");
+            return Err("image is not square".to_string());
         }
         if x < 1024 || y < 1024 {
-            return Err("Image resolution must be grater or equal to 1024 x 1024");
+            return Err("Image resolution must be grater or equal to 1024 x 1024".to_string());
         } 
         if x > 1024 || y > 1024 {
             let resize_image = imageops::resize(&img, 1024, 1024, imageops::FilterType::CatmullRom);
