@@ -26,10 +26,9 @@ Build and install binary
 ```
 cargo install --path .
 ```
-Run the program
-```
-icon_image <INPUT_PATH> <OUTPUT_PATH>
-```
+
+## Usage
+
 ```
 Usage: icon_image <INPUT_PATH> <OUTPUT_PATH>
 
@@ -43,5 +42,4 @@ Options:
   -V, --version  Print version
 ```
 
-## Screenshot
 
